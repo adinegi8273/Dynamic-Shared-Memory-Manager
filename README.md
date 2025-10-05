@@ -130,3 +130,53 @@ It supports multiple allocation strategies (**First Fit**, **Best Fit**, **Worst
   void shm_heap_free(uint64_t offset);
   void* shm_heap_local_ptr(uint64_t offset);
   void shm_heap_close();
+
+  ---
+
+### **Phase 4 — Allocation Strategies & Concurrency**
+- Implement allocation strategies:
+  - **First Fit**
+  - **Best Fit**
+  - **Worst Fit**
+- Wrap allocation and deallocation with synchronization mechanisms:
+  - Linux: `pthread_mutex_t` in shared memory
+  - Windows: `CreateMutex` or custom spinlock
+- Test concurrent allocations and frees from multiple processes
+- Validate correctness and ensure no race conditions or deadlocks
+
+---
+
+### **Phase 5 — Testing & Validation**
+- **Functional Testing**
+  - Allocation and deallocation correctness
+  - Edge cases: zero-size requests, oversized allocations, full heap
+- **Concurrency Testing**
+  - Multiple processes allocating/freeing simultaneously
+  - Verify absence of race conditions or deadlocks
+- **Performance Testing**
+  - Measure allocation latency and throughput
+  - Analyze fragmentation for different allocation strategies
+- **Memory Debugging**
+  - Use Valgrind or AddressSanitizer to detect leaks or invalid accesses
+
+---
+
+### **Phase 6 — Documentation & Diagrams**
+- Generate API documentation using **Doxygen**
+- Provide usage examples in `README.md` or `examples/` folder
+- Create diagrams illustrating:
+  - Memory layout
+  - Allocation workflow
+  - Synchronization and concurrency
+
+---
+
+### **Phase 7 — Final Report & Delivery**
+- Compile a comprehensive project report including:
+  - Design decisions
+  - Testing methodology and results
+  - Performance benchmarks
+  - Lessons learned
+- Include all diagrams and API references
+- Archive final code, documentation, and example programs for release
+

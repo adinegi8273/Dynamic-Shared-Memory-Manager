@@ -4,6 +4,7 @@
 #include <sys/wait.h>
 #include "SharedMemory.h"
 #include "FirstFitAllocator.h"
+#include "BestFitAllocator.h"
 
 using namespace std;
 
@@ -15,24 +16,32 @@ struct ThreadArgs {
     SharedMemory* shm;
     int processID;
     int allocationSize;
+    bool useBestFit;
 };
 
 // Thread function
 void* threadFunc(void* arg) {
     ThreadArgs* args = (ThreadArgs*)arg;
-    firstFitAllocate(args->shm, args->processID, args->allocationSize);
+    if (args->useBestFit) {
+        bestFitAllocate(args->shm, args->processID, args->allocationSize);
+    } else {
+        firstFitAllocate(args->shm, args->processID, args->allocationSize);
+    }
     return nullptr;
 }
 
 // Function to run in child process
-void runProcess(SharedMemory* shm, int processID) {
+void runProcess(SharedMemory* shm, int processID, bool useBestFit = false) {
     pthread_t threads[NUM_THREADS];
     ThreadArgs args[NUM_THREADS];
+
+    cout << "Process " << processID << " using " << (useBestFit ? "Best Fit" : "First Fit") << " algorithm" << endl;
 
     for (int i = 0; i < NUM_THREADS; i++) {
         args[i].shm = shm;
         args[i].processID = processID;
         args[i].allocationSize = (i + 1) * 256; // each thread allocates 256, 512, 768 bytes etc
+        args[i].useBestFit = useBestFit;
         pthread_create(&threads[i], nullptr, threadFunc, &args[i]);
     }
 
@@ -57,8 +66,8 @@ int main() {
     }
 
     if (pid1 == 0) {
-        // Child process 1
-        runProcess(&shm, 1);
+        // Child process 1 - First Fit
+        runProcess(&shm, 1, false);
         destroySharedMemory(&shm);
         exit(0);
     }
@@ -70,8 +79,8 @@ int main() {
     }
 
     if (pid2 == 0) {
-        // Child process 2
-        runProcess(&shm, 2);
+        // Child process 2 - Best Fit
+        runProcess(&shm, 2, true);
         destroySharedMemory(&shm);
         exit(0);
     }
@@ -80,7 +89,7 @@ int main() {
     waitpid(pid1, nullptr, 0);
     waitpid(pid2, nullptr, 0);
 
-    cout << "Final memory layout in parent:" << endl;
+    cout << "Final memory layout in parent (comparing First Fit vs Best Fit):" << endl;
     printMemoryLayout(&shm);
 
     destroySharedMemory(&shm);

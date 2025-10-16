@@ -1,0 +1,96 @@
+<!doctype html>
+<html>
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>Dynamic Shared Memory Manager</title>
+	<style>
+		body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; background: #0b1020; color: #e8ecf1; }
+		header { background: #131a33; padding: 16px 20px; }
+		header h1 { margin: 0; font-size: 18px; letter-spacing: 0.5px; }
+		.container { padding: 20px; max-width: 900px; margin: 0 auto; }
+		.toolbar { display: flex; gap: 8px; margin-bottom: 12px; }
+		button { background: #2b74ff; color: white; border: 0; padding: 8px 12px; border-radius: 6px; cursor: pointer; }
+		button.secondary { background: #253052; }
+		input[type=text] { background: #0f1834; color: #e8ecf1; border: 1px solid #243056; padding: 8px; border-radius: 6px; width: 100%; }
+		.card { background: #0f1834; border: 1px solid #1b2749; border-radius: 10px; padding: 14px; }
+		.output { white-space: pre-wrap; background: #0b0f22; border: 1px solid #1b2749; border-radius: 10px; padding: 12px; min-height: 220px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+		.grid { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+		@media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+	</style>
+</head>
+<body>
+	<header>
+		<h1>Dynamic Shared Memory Manager — Web Console</h1>
+	</header>
+	<div class="container">
+		<div class="toolbar">
+			<button id="start">Start Backend</button>
+			<button id="show" class="secondary">Show Layout</button>
+		</div>
+		<div class="grid">
+			<div class="card">
+				<h3>Command</h3>
+				<div style="display:flex; gap:8px; align-items:center;">
+					<input type="text" id="cmd" placeholder="e.g. alloc 1 1024 | free 1 0 | help" />
+					<button id="send">Send</button>
+				</div>
+				<p style="opacity:.8; margin-top:8px;">Commands: <code>alloc &lt;pid&gt; &lt;size&gt;</code>, <code>free &lt;pid&gt; &lt;offset&gt;</code>, <code>show</code>, <code>help</code>, <code>exit</code></p>
+			</div>
+			<div class="card">
+				<h3>Quick Actions</h3>
+				<div style="display:flex; flex-direction:column; gap:8px;">
+					<button onclick="send('alloc 1 256')">alloc 1 256</button>
+					<button onclick="send('alloc 1 512')">alloc 1 512</button>
+					<button onclick="send('alloc 2 1024')">alloc 2 1024</button>
+					<button class="secondary" onclick="send('show')">show</button>
+				</div>
+			</div>
+		</div>
+		<div class="card" style="margin-top:14px;">
+			<h3>Output</h3>
+			<pre id="out" class="output"></pre>
+		</div>
+		<div class="card" style="margin-top:14px;">
+			<h3>Free a Block</h3>
+			<div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+				<input type="text" id="freePid" placeholder="pid (e.g. 1)" style="max-width:160px;" />
+				<input type="text" id="freeOffset" placeholder="offset (e.g. 0)" style="max-width:200px;" />
+				<button id="freeBtn" class="secondary">Free</button>
+			</div>
+			<p style="opacity:.8; margin-top:8px;">This runs <code>free &lt;pid&gt; &lt;offset&gt;</code>.</p>
+		</div>
+	</div>
+
+	<script>
+		const out = document.getElementById('out');
+		function append(txt){ out.textContent += txt; out.scrollTop = out.scrollHeight; }
+		async function start(){
+			append('Starting backend...\n');
+			const r = await fetch('/api/start', { method:'POST' });
+			const j = await r.json();
+			append(JSON.stringify(j) + '\n');
+		}
+		async function send(cmd){
+			if(!cmd){ cmd = document.getElementById('cmd').value.trim(); }
+			if(!cmd) return;
+			const r = await fetch('/api/cmd', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({cmd}) });
+			const j = await r.json();
+			if(j.ok){ append(j.output); } else { append('ERR: ' + (j.error||'unknown') + '\n'); }
+		}
+		document.getElementById('start').onclick = start;
+		document.getElementById('send').onclick = ()=>send();
+		document.getElementById('show').onclick = ()=>send('show');
+		document.getElementById('freeBtn').onclick = ()=>{
+			const pid = document.getElementById('freePid').value.trim();
+			const off = document.getElementById('freeOffset').value.trim();
+			if(!pid || !off){ append('Please enter pid and offset.\n'); return; }
+			send(`free ${pid} ${off}`);
+		};
+		// Auto-start for convenience
+		start();
+	</script>
+</body>
+</html>
+
+

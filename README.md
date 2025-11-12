@@ -3,7 +3,7 @@
 ### Cross-Platform Shared Memory Allocator for Inter-Process Communication
 
 This project implements a **Dynamic Shared Memory Manager** — a C++17 library that provides dynamic memory allocation and deallocation across multiple processes using a shared memory region.  
-It supports multiple allocation strategies (**First Fit**, **Best Fit**, **Worst Fit**) and works on both **Linux** and **Windows** platforms.
+It supports multiple allocation strategies (**First Fit**, **Best Fit**, **Worst Fit**, **Next Fit**) and works on both **Linux** and **Windows** platforms.
 
 ---
 
@@ -11,7 +11,7 @@ It supports multiple allocation strategies (**First Fit**, **Best Fit**, **Worst
 
 - Implement a cross-platform shared memory management system.
 - Support dynamic memory allocation/deallocation across multiple processes.
-- Provide configurable allocation strategies (First Fit, Best Fit, Worst Fit).
+- Provide configurable allocation strategies (First Fit, Best Fit, Worst Fit, Next Fit).
 - Design synchronization mechanisms for safe concurrent access.
 - Offer a simple C++ API (`alloc`, `free`, `init`, `close`, etc.).
 - Test and validate performance, fragmentation, and concurrency behavior.
@@ -25,7 +25,7 @@ It supports multiple allocation strategies (**First Fit**, **Best Fit**, **Worst
 |----------|-------------|
 | **Cross-platform** | Compatible with Linux (POSIX APIs) and Windows (Win32 APIs) |
 | **Dynamic allocation** | Supports variable-size memory allocation/deallocation |
-| **Multiple strategies** | First Fit, Best Fit, and Worst Fit algorithms |
+| **Multiple strategies** | First Fit, Best Fit, Worst Fit, and Next Fit algorithms |
 | **Offset-based memory model** | Ensures pointer validity across process address spaces |
 | **Synchronization** | Interprocess-safe mutex/spinlock for concurrent access |
 | **Diagnostics** | Heap validation, debug logging, and state dumps |
@@ -138,6 +138,7 @@ It supports multiple allocation strategies (**First Fit**, **Best Fit**, **Worst
   - **First Fit**
   - **Best Fit**
   - **Worst Fit**
+  - **Next Fit**
 - Wrap allocation and deallocation with synchronization mechanisms:
   - Linux: `pthread_mutex_t` in shared memory
   - Windows: `CreateMutex` or custom spinlock

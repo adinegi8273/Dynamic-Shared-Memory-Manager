@@ -44,6 +44,7 @@ struct SharedMemory {
 void initSharedMemory(SharedMemory* shm, const char* filename, size_t size);
 void destroySharedMemory(SharedMemory* shm);
 void initializeMemoryLayout(SharedMemory* shm);
+void resetMemoryLayout(SharedMemory* shm);
 void printMemoryLayout(SharedMemory* shm);
 void lockMemory(SharedMemory* shm);
 void unlockMemory(SharedMemory* shm);

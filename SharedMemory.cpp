@@ -52,6 +52,23 @@ void initializeMemoryLayout(SharedMemory* shm) {
     }
 }
 
+// Reset memory header and block array while preserving mutex initialization
+void resetMemoryLayout(SharedMemory* shm) {
+    lockMemory(shm);
+
+    shm->header->used_size = 0;
+    shm->header->free_offset = 0;
+
+    for (int i = 0; i < MAX_BLOCKS; i++) {
+        shm->blockArray[i].pid = -1;
+        shm->blockArray[i].size = 0;
+        shm->blockArray[i].isFree = true;
+        shm->blockArray[i].offset = 0;
+    }
+
+    unlockMemory(shm);
+}
+
 // Print memory layout
 void printMemoryLayout(SharedMemory* shm) {
     lockMemory(shm);

@@ -1,183 +1,105 @@
-# 🧠 Dynamic Shared Memory Manager
+# Multi-Process Shared Memory Allocator (C++ / POSIX)
 
-### Cross-Platform Shared Memory Allocator for Inter-Process Communication
+A C++ systems programming project that simulates OS-level memory allocation across multiple **concurrent processes**, using POSIX shared memory (`mmap`) and process-shared synchronization (`pthread_mutex_t`).
 
-This project implements a **Dynamic Shared Memory Manager** — a C++17 library that provides dynamic memory allocation and deallocation across multiple processes using a shared memory region.  
-It supports multiple allocation strategies (**First Fit**, **Best Fit**, **Worst Fit**, **Next Fit**) and works on both **Linux** and **Windows** platforms.
+Multiple child processes, created via `fork()`, all read from and write to a single shared memory pool — safely, without race conditions — to request memory using the **First Fit** allocation strategy.
 
----
+## Overview
 
-## 🚀 Project Objectives
+This project demonstrates:
 
-- Implement a cross-platform shared memory management system.
-- Support dynamic memory allocation/deallocation across multiple processes.
-- Provide configurable allocation strategies (First Fit, Best Fit, Worst Fit, Next Fit).
-- Design synchronization mechanisms for safe concurrent access.
-- Offer a simple C++ API (`alloc`, `free`, `init`, `close`, etc.).
-- Test and validate performance, fragmentation, and concurrency behavior.
-- Produce technical documentation, diagrams, and final report.
+- **Shared memory via `mmap()`** — a file-backed memory region (`shared_mem.txt`) mapped into multiple processes, so they all see and modify the exact same physical memory.
+- **Process synchronization** — a `pthread_mutex_t`, configured with `PTHREAD_PROCESS_SHARED`, ensures only one process can modify shared allocation state at a time.
+- **Multi-process concurrency** — the parent process `fork()`s several child processes, each of which independently requests memory from the shared pool.
+- **First Fit allocation** — scans a shared block-tracking array and allocates the requested memory at the next available offset.
+- **Deterministic test scenarios** — a helper function that pre-hardcodes part of the memory as "already allocated," so allocation/failure behavior can be predicted and verified reproducibly.
 
----
+## How It Works
 
-## 🧩 Core Features
+1. The parent process creates and initializes a 64KB shared memory region, backed by a memory-mapped file.
+2. The shared region is divided into three sections:
+   - **Header** — tracks total size, used size, the next free offset, and holds the shared mutex.
+   - **Block array** — a fixed-size array of block records (owner PID, size, free/used status, offset).
+   - **Data region** — the actual bytes handed out to processes.
+3. The parent optionally pre-fills some blocks as already allocated (for repeatable testing), then `fork()`s several child processes.
+4. Each child process calls `firstFitAllocate()`, requesting a specific amount of memory. Access to the shared header and block array is protected by a mutex, so concurrent requests from different processes never corrupt each other's data.
+5. The parent waits for all children to finish (`waitpid()`), then cleans up the shared memory mapping.
 
-| Feature | Description |
-|----------|-------------|
-| **Cross-platform** | Compatible with Linux (POSIX APIs) and Windows (Win32 APIs) |
-| **Dynamic allocation** | Supports variable-size memory allocation/deallocation |
-| **Multiple strategies** | First Fit, Best Fit, Worst Fit, and Next Fit algorithms |
-| **Offset-based memory model** | Ensures pointer validity across process address spaces |
-| **Synchronization** | Interprocess-safe mutex/spinlock for concurrent access |
-| **Diagnostics** | Heap validation, debug logging, and state dumps |
-| **Testing Suite** | Unit tests and multi-process functional tests |
+Because process execution order is scheduled by the OS and is **not guaranteed**, running the program multiple times may show child processes completing (and receiving offsets) in a different order each time — while the *correctness* of the final allocation state remains guaranteed, thanks to the mutex.
 
----
+## Project Structure
 
-## 🛠️ Tools & Technologies
+```
+.
+├── SharedMemory.h / SharedMemory.cpp        # shared memory setup, teardown, locking, layout printing
+├── FirstFitAllocator.h / FirstFitAllocator.cpp  # First Fit allocation and freeing logic
+├── main.cpp                                  # forks child processes, drives the demo
+```
 
-### Development Environment
+## Requirements
 
-| Category | Tool | Purpose |
-|-----------|------|----------|
-| Compiler | GCC / MSVC / Clang | C++17 or newer support |
-| Build System | CMake | Cross-platform build configuration |
-| Version Control | Git | Track changes and collaborate |
-| IDE | VS Code / Visual Studio / CLion | Development and debugging |
+- Linux or macOS (uses POSIX APIs: `mmap`, `fork`, `pthread`)
+- `g++` with C++11 or later
+- POSIX threads support (`-lpthread`)
 
-### OS-Level APIs
+## Build Instructions
 
-| OS | API / Header | Purpose |
-|----|---------------|----------|
-| Linux | `shm_open`, `ftruncate`, `mmap`, `pthread_mutex_t` | Shared memory and interprocess synchronization |
-| Windows | `CreateFileMapping`, `MapViewOfFile`, `CreateMutex` | Shared memory mapping and synchronization |
+Clone the repository, then compile all source files together:
 
-### Optional Libraries
+```bash
+g++ -o allocator_demo main.cpp SharedMemory.cpp FirstFitAllocator.cpp -lpthread
+```
 
-| Library | Use |
-|----------|-----|
-| GoogleTest (gtest) | Unit testing |
-| spdlog / loguru | Logging |
-| Valgrind / AddressSanitizer | Memory debugging |
-| Draw.io / Figma | Diagrams |
-| Doxygen | Documentation generation |
+This produces an executable named `allocator_demo`.
 
----
+## Running
 
-## 🧪 Testing Tools
+```bash
+./allocator_demo
+```
 
-- **CTest** for integration with CMake
-- **Python 3** scripts for multi-process tests
-- **Shell / PowerShell** automation
-- **Valgrind / Helgrind** for race detection
-- **Visual Studio Debugger / GDB** for step debugging
+Each run will:
+1. Initialize shared memory and print a confirmation.
+2. Pre-allocate two hardcoded blocks (for a reproducible test scenario).
+3. Fork multiple child processes, each requesting a fixed amount of memory.
+4. Print each child's allocation result (success with offset, or failure if there isn't enough space).
+5. Print a completion message once all children have finished.
 
----
+### Example Output
 
-## 📚 Documentation Tools
+```
+Shared memory initialized.
+Pre-allocated: Process 9001 (10000 bytes at offset 0), Process 9002 (20000 bytes at offset 10000).
+Process 1327 allocated 20000 bytes at offset 30000
+Process 1328 allocated 10000 bytes at offset 50000
+Process 1329: Allocation failed for 8000 bytes!
+Parent: child finished.
+```
 
-- **Draw.io** or **Figma** for architecture diagrams  
-- **Markdown / Doxygen** for inline API documentation  
-- **MS Word / Google Docs** for project report  
-- **MS PowerPoint / Google Slides** for presentation slides  
+> Note: the order in which child processes complete (and thus which one fails, if total demand exceeds capacity) may vary between runs — this reflects real, non-deterministic OS process scheduling, not a bug.
 
----
+## Cleaning Up
 
-## 🔐 Debugging & Profiling Tools
+The program creates a file named `shared_mem.txt` in the working directory to back the shared memory region. This file persists after the program exits. Delete it if you want to start with a completely fresh memory state on the next run:
 
-| Tool | Use |
-|------|-----|
-| GDB / LLDB | Debugging on Linux/macOS |
-| Visual Studio Debugger | Debugging on Windows |
-| strace / ltrace | Trace system calls |
-| Process Explorer | Inspect shared memory handles |
-| Perf / WPR | Performance profiling |
+```bash
+rm shared_mem.txt
+```
 
----
+(If the file already exists from a previous run, the program will reuse and re-initialize it — memory state is explicitly reset at the start of every run via `initializeMemoryLayout()`.)
 
-## 🗂️ Project Roadmap (Phases)
+## Key OS Concepts Demonstrated
 
-### **Phase 0 — Kickoff & Planning**
-- Finalize project scope, OS targets, and team roles.
-- Initialize Git repository and CMake structure.
-- Create initial `README.md` and diagrams folder.
+- Virtual memory and per-process address spaces
+- Memory-mapped files (`mmap`) as a mechanism for shared memory / IPC
+- File descriptors and their role independent of memory mappings
+- Process creation and duplication semantics (`fork()`)
+- Process-shared mutexes vs. thread-only mutexes
+- Race conditions and how mutual exclusion prevents them
+- Non-deterministic process scheduling vs. deterministic, synchronized shared-state correctness
 
----
+## Future Improvements
 
-### **Phase 1 — Research & Design**
-- Define shared memory layout (header, freelist, block structure).
-- Choose synchronization model (POSIX mutex / Win32 mutex / spinlock).
-- Decide pointer model (offset-based addressing).
-- Draft API surface (`alloc`, `free`, `init`, etc.).
-- Create architecture and memory layout diagrams.
-
----
-
-### **Phase 2 — Shared Mapping Layer**
-- Implement cross-platform shared memory mapping:
-  - **Linux:** `shm_open`, `mmap`
-  - **Windows:** `CreateFileMapping`, `MapViewOfFile`
-- Create `SharedMapping` abstraction class.
-- Test by creating and opening mappings in multiple processes.
-
----
-
-### **Phase 3 — Heap Initialization & API**
-- Define `SharedHeapHeader` and `BlockHeader` structures.
-- Implement minimal allocation API:
-  ```cpp
-  bool shm_heap_init(const char* name, size_t size, AllocStrategy s);
-  uint64_t shm_heap_alloc(uint64_t size);
-  void shm_heap_free(uint64_t offset);
-  void* shm_heap_local_ptr(uint64_t offset);
-  void shm_heap_close();
-
-  ---
-
-### **Phase 4 — Allocation Strategies & Concurrency**
-- Implement allocation strategies:
-  - **First Fit**
-  - **Best Fit**
-  - **Worst Fit**
-  - **Next Fit**
-- Wrap allocation and deallocation with synchronization mechanisms:
-  - Linux: `pthread_mutex_t` in shared memory
-  - Windows: `CreateMutex` or custom spinlock
-- Test concurrent allocations and frees from multiple processes
-- Validate correctness and ensure no race conditions or deadlocks
-
----
-
-### **Phase 5 — Testing & Validation**
-- **Functional Testing**
-  - Allocation and deallocation correctness
-  - Edge cases: zero-size requests, oversized allocations, full heap
-- **Concurrency Testing**
-  - Multiple processes allocating/freeing simultaneously
-  - Verify absence of race conditions or deadlocks
-- **Performance Testing**
-  - Measure allocation latency and throughput
-  - Analyze fragmentation for different allocation strategies
-- **Memory Debugging**
-  - Use Valgrind or AddressSanitizer to detect leaks or invalid accesses
-
----
-
-### **Phase 6 — Documentation & Diagrams**
-- Generate API documentation using **Doxygen**
-- Provide usage examples in `README.md` or `examples/` folder
-- Create diagrams illustrating:
-  - Memory layout
-  - Allocation workflow
-  - Synchronization and concurrency
-
----
-
-### **Phase 7 — Final Report & Delivery**
-- Compile a comprehensive project report including:
-  - Design decisions
-  - Testing methodology and results
-  - Performance benchmarks
-  - Lessons learned
-- Include all diagrams and API references
-- Archive final code, documentation, and example programs for release
-
+- Extend the block model so freed memory can be reused by future allocations (the current design always advances a high-water-mark offset and never reclaims freed gaps).
+- Implement Best Fit, Worst Fit, and Next Fit with genuine placement differences (requires reworking the block array into a proper segment-based free-list model).
+- Add block coalescing (merging adjacent free segments) after frees.
